@@ -120,9 +120,9 @@ public class CircularDetection {
 						_list.add(user);
 						user_id = user.getManagerId();
 					} else {
-						int _crid = getManger(user.getManagerId(), user.getUserId(), user.getUserName(), _list);
+						int _crid = getManager(user.getManagerId(), user.getUserId(), user.getUserName(), _list);
 						if (_crid != -1) {
-							if (putUnique(_crlist, _crid, _crid)) {
+							if (isUnique(_crlist, _crid, _crid)) {
 								System.out.println(userName + " >>Fix User Id :" + _crid);
 							}
 						}
@@ -136,7 +136,7 @@ public class CircularDetection {
 		return _crlist;
 	}
 
-	public static int getManger(int managerId, int userid, String userName, ArrayList<UserData> _list) {
+	public static int getManager(int managerId, int userid, String userName, ArrayList<UserData> _list) {
 		UserData users = null;
 		boolean data = true;
 		int _crid = -1;
@@ -169,7 +169,7 @@ public class CircularDetection {
 				data = false;
 			} else {
 				if (user_id != -1) {
-					if (putUnique(map, user.getUserId(), user.getManagerId())) {
+					if (isUnique(map, user.getUserId(), user.getManagerId())) {
 						user_id = user.getManagerId();
 						_log.append(user.getUserName()).append("->");
 					} else {
@@ -190,7 +190,7 @@ public class CircularDetection {
 		return data;
 	}
 
-	private static <K, V> boolean putUnique(Map<K, V> map, K key, V v1) {
+	private static <K, V> boolean isUnique(Map<K, V> map, K key, V v1) {
 		V v2 = map.putIfAbsent(key, v1);
 		if (v2 != null) {
 			return false;
@@ -201,10 +201,6 @@ public class CircularDetection {
 
 	public static final UserData getUserId(int userId, ArrayList<UserData> user) {
 		return user.stream().filter(m -> m.UserId == userId).findAny().orElse(null);
-	}
-
-	public static final UserData getManagerId(int managerId, ArrayList<UserData> user) {
-		return user.stream().filter(m -> m.ManagerId == managerId).findAny().orElse(null);
 	}
 
 	public static ArrayList<UserData> getUsers(Statement stmt, Connection c) {
