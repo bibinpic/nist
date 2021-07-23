@@ -20,26 +20,27 @@ public class CircularDetection {
 			// Get All Users
 			ArrayList<UserData> users = getUsers(stmt, c);
 
-			ArrayList<UserData> manager = new ArrayList<UserData>();
-
 			System.out.println("--------Print all CR Issues--------");
 			Map<Integer, Integer> _fixlist = new HashMap<Integer, Integer>();
 			// Detect CR and report
 			for (UserData user : users) {
 				getReport(user.getUserId(), user.getUserName(), users, true);
 			}
-			
+
+			ArrayList<UserData> manager = new ArrayList<UserData>();
+
 			System.out.println("--------Fix all CR Issues--------");
 			// Fix CR Issue User Objects
 			for (UserData user : users) {
 				manager.add(user);
-				_fixlist = detectCRAndBuildFixList(user.getUserId(), user.getUserName(), manager, _fixlist);
+				_fixlist = getCRfixuser(user.getUserId(), user.getUserName(), manager, _fixlist);
 			}
 
 			for (int user_id : _fixlist.values()) {
-				fixUserManger(stmt, c, user_id);
-				c.commit();
+				// fixUserManger(stmt, c, user_id);
+				// c.commit();
 			}
+
 			// Reload users
 			users = getUsers(stmt, c);
 
@@ -105,8 +106,8 @@ public class CircularDetection {
 		private String UserName;
 	}
 
-	private static Map<Integer, Integer> detectCRAndBuildFixList(int user_id, String userName,
-			ArrayList<UserData> users, Map<Integer, Integer> _crlist) {
+	private static Map<Integer, Integer> getCRfixuser(int user_id, String userName, ArrayList<UserData> users,
+			Map<Integer, Integer> _crlist) {
 		ArrayList<UserData> _list = new ArrayList<UserData>();
 		UserData user = null;
 		boolean data = true;
@@ -151,6 +152,9 @@ public class CircularDetection {
 					managerId = userdata.getManagerId();
 					_crid = userdata.getUserId();
 				} else {
+					if (_list.size() == 2) {
+						_crid = userdata.getManagerId();
+					}
 					data = false;
 				}
 			}
@@ -226,7 +230,7 @@ public class CircularDetection {
 		return users;
 	}
 
-	public static void fixUserManger(Statement stmt, Connection c, int id) {
+	public static void fixUserManager(Statement stmt, Connection c, int id) {
 		try {
 			stmt = c.createStatement();
 			String sql = "UPDATE people set manager_id =-1 where id=" + id;
