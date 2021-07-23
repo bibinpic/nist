@@ -37,8 +37,8 @@ public class CircularDetection {
 			}
 
 			for (int user_id : _fixlist.values()) {
-				// fixUserManger(stmt, c, user_id);
-				// c.commit();
+				fixCRChain(stmt, c, user_id);
+				 c.commit();
 			}
 
 			// Reload users
@@ -230,7 +230,7 @@ public class CircularDetection {
 		return users;
 	}
 
-	public static void fixUserManager(Statement stmt, Connection c, int id) {
+	public static void fixCRChain(Statement stmt, Connection c, int id) {
 		try {
 			stmt = c.createStatement();
 			String sql = "UPDATE people set manager_id =-1 where id=" + id;
