@@ -117,7 +117,7 @@ public class SyncronizeTables {
 				sql = "UPDATE SYSTEM2_USR set system2_displayname ='" + user.getName() + "' where SYSTEM2_USR_ID="
 						+ user.getId();
 			} else {
-				sql = "INSERT INTO SYSTEM2_USR (SYSTEM2_USR_ID,system2_grp_nm) " + "VALUES (" + user.getId() + ",'"
+				sql = "INSERT INTO SYSTEM2_USR (SYSTEM2_USR_ID,system2_displayname) " + "VALUES (" + user.getId() + ",'"
 						+ user.getName() + "');";
 			}
 			rs.close();
