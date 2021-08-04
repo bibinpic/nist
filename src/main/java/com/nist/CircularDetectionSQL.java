@@ -6,7 +6,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
 
-public class CircularDetection {
+public class CircularDetectionSQL {
 	public static void main(String[] args) {
 
 		Connection c = null;
@@ -17,84 +17,38 @@ public class CircularDetection {
 			c = DriverManager.getConnection("jdbc:postgresql://localhost:5432/nist", "postgres", "password");
 			c.setAutoCommit(false);
 			System.out.println("Opened database successfully");
-			// Get All Users
-			ArrayList<UserData> users = getUsers(stmt, c);
-			
-			System.out.println("--------Print all CR Issues--------");
-			Map<Integer, Integer> _fixlist = new HashMap<Integer, Integer>();
-			// Detect CR and report
-			for (UserData user : users) {
-				getReport(user.getUserId(), user.getUserName(), users, true);
-			}
 
+			// Get All CR Users Chain
+			System.out.println("--------Print all CR Issues--------");
+
+			ArrayList<UserData> users = getCRUsersChain(stmt, c);
+
+			// Fix CR Issue User Objects
+			Map<Integer, Integer> _fixids = new HashMap<Integer, Integer>();
 			ArrayList<UserData> manager = new ArrayList<UserData>();
 			System.out.println("--------Fix all CR Issues--------");
-			// Fix CR Issue User Objects
 			for (UserData user : users) {
-				 manager.add(user);
-				_fixlist = getCRfixuser(user.getUserId(), user.getUserName(), manager, _fixlist);
+				manager.add(user);
+				_fixids = getCRfixuser(user.getUserId(), user.getUserName(), manager, _fixids);
 			}
 
-			for (int user_id : _fixlist.values()) {
+			for (int user_id : _fixids.values()) {
 				fixCRChain(stmt, c, user_id);
 				c.commit();
 			}
-			// Reload users
-			users = getUsers(stmt, c);
-			// Report all user after CR fix
 			System.out.println("--------- Print results after CR  fix ----------");
+
 			for (UserData user : users) {
-				getReport(user.getUserId(), user.getUserName(), users, false);
+				reportFixedUserChain(stmt, c, user);
 			}
 			c.close();
+
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
 			System.exit(0);
 		}
 
 	}
-
-	private static class UserData {
-		public UserData(int userId, int managerId, String ManagerName, String UserName) {
-			setUserId(userId);
-			setManagerId(managerId);
-			setManagerName(ManagerName);
-			setUserName(UserName);
-		}
-
-		private int UserId;
-
-		public final int getUserId() {
-			return UserId;
-		}
-
-		public final void setUserId(int value) {
-			UserId = value;
-		}
-
-		private int ManagerId;
-		public final int getManagerId() {
-			return ManagerId;
-		}
-		public final void setManagerId(int value) {
-			ManagerId = value;
-		}
-		public String getManagerName() {
-			return ManagerName;
-		}
-		public void setManagerName(String managerName) {
-			ManagerName = managerName;
-		}
-		public String getUserName() {
-			return UserName;
-		}
-		public void setUserName(String userName) {
-			UserName = userName;
-		}
-		private String ManagerName;
-		private String UserName;
-	}
-
 	private static Map<Integer, Integer> getCRfixuser(int user_id, String userName, ArrayList<UserData> users,
 			Map<Integer, Integer> _crlist) {
 		ArrayList<UserData> _list = new ArrayList<UserData>();
@@ -108,12 +62,12 @@ public class CircularDetection {
 				if (user_id != -1) {
 					if (!_list.contains(user)) {
 						_list.add(user);
-						user_id = user.getManagerId();
+						 user_id = user.getManagerId();
 					} else {
 						int _crid = getManager(user.getManagerId(), user.getUserId(), user.getUserName(), _list);
 						if (_crid != -1) {
 							if (isUnique(_crlist, _crid, _crid)) {
-								System.out.println(userName + " >>Fix User Id :" + _crid);
+								System.out.println(userName + " >>User ID to Correct :" + _crid);
 							}
 						}
 						data = false;
@@ -125,7 +79,14 @@ public class CircularDetection {
 		}
 		return _crlist;
 	}
-
+	private static <K, V> boolean isUnique(Map<K, V> map, K key, V v1) {
+		V v2 = map.putIfAbsent(key, v1);
+		if (v2 != null) {
+			return false;
+		} else {
+			return true;
+		}
+	}
 	public static int getManager(int managerId, int userid, String userName, ArrayList<UserData> _list) {
 		UserData users = null;
 		boolean data = true;
@@ -141,7 +102,7 @@ public class CircularDetection {
 					managerId = userdata.getManagerId();
 					_crid = userdata.getUserId();
 				} else {
-					if (_list.size()==1||_list.size() == 2) {
+					if (_list.size() == 1 || _list.size() == 2) {
 						_crid = userdata.getManagerId();
 					}
 					data = false;
@@ -151,64 +112,24 @@ public class CircularDetection {
 		return _crid;
 	}
 
-	private static boolean getReport(int user_id, String userName, ArrayList<UserData> users, boolean _crOnly) {
-		StringBuilder _log = new StringBuilder();
-		Map<Integer, Integer> map = new HashMap<Integer, Integer>();
-		UserData user = null;
-		boolean data = true;
-		while (data) {
-			user = getUserId(user_id, users);
-			if (user == null) {
-				data = false;
-			} else {
-				if (user_id != -1) {
-					if (isUnique(map, user.getUserId(), user.getManagerId())) {
-						user_id = user.getManagerId();
-						_log.append(user.getUserName()).append("->");
-					} else {
-						_log.append(user.getUserName());
-						System.out.println(userName + " >> CR Detected : " + _log.toString());
-						data = false;
-					}
-				} else {
-					_log.append(user.getManagerName());
-					data = false;
-				}
-			}
-		}
-		// Log after CR
-		if (!_crOnly) {
-			System.out.println(userName + " >> Path : " + _log.toString());
-		}
-		return data;
-	}
-
-	private static <K, V> boolean isUnique(Map<K, V> map, K key, V v1) {
-		V v2 = map.putIfAbsent(key, v1);
-		if (v2 != null) {
-			return false;
-		} else {
-			return true;
-		}
-	}
-
 	public static final UserData getUserId(int userId, ArrayList<UserData> user) {
 		return user.stream().filter(m -> m.UserId == userId).findAny().orElse(null);
 	}
 
-	public static ArrayList<UserData> getUsers(Statement stmt, Connection c) {
+	public static ArrayList<UserData> getCRUsersChain(Statement stmt, Connection c) {
 		ArrayList<UserData> users = new ArrayList<UserData>();
 		try {
 			stmt = c.createStatement();
 			ResultSet rs = stmt.executeQuery(
-					"select a.id as id , a.username user_name,b.username manager_name,a.manager_id as manager_id from "
-					+ "people a left join people b on a.manager_id = b.id order by a.id;");
+					"select array_to_string(path, ' > ') cr_managers,cr_managers.idpath,cr_managers.username,cr_managers.id,cr_managers.manager_id\r\n"
+					+ "from cr_managers where cycle and manager_id<>-1 order by id");
 			while (rs.next()) {
 				int id = rs.getInt("id");
-				String name = rs.getString("user_name");
+				String name = rs.getString("username");
 				int manager_id = rs.getInt("manager_id");
-				String manager_name = rs.getString("manager_name");
-				UserData user = new UserData(id, manager_id, manager_name, name);
+				String path = rs.getString("cr_managers");
+				System.out.println(name + " : CR Happened: -> " + path);
+				UserData user = new UserData(id, manager_id, name);
 				users.add(user);
 			}
 			rs.close();
@@ -219,7 +140,29 @@ public class CircularDetection {
 		}
 		return users;
 	}
-
+	public static void reportFixedUserChain(Statement stmt, Connection c, UserData user) {
+		try {
+			stmt = c.createStatement();
+			ResultSet rs = stmt
+					.executeQuery("WITH RECURSIVE managers(id, manager_id,username, depth, path, cycle) AS (\r\n"
+							+ "	SELECT u.id, u.manager_id,u.username, 1,\r\n" + "		ARRAY[u.username],\r\n"
+							+ "		false\r\n" + "	FROM people u where u.id =" + user.getUserId() + "	UNION ALL\r\n"
+							+ "	SELECT u.id, u.manager_id,u.username, cm.depth + 1,\r\n"
+							+ "		path || u.username,\r\n" + "		u.username = ANY(path)\r\n"
+							+ "	FROM people u, managers cm\r\n" + "	WHERE u.id = cm.manager_id AND NOT cycle\r\n"
+							+ "	)\r\n" + "\r\n"
+							+ "select array_to_string (path[array_lower(path,1) : array_upper(path,1)-1],'>')  managers from managers where cycle ");
+			while (rs.next()) {
+				String manager = rs.getString("managers");
+				System.out.println(user.getUserName() + " : Fixed CR Happened-> " + manager);
+			}
+			rs.close();
+			stmt.close();
+		} catch (Exception e) {
+			System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			System.exit(0);
+		}
+	}
 	public static void fixCRChain(Statement stmt, Connection c, int id) {
 		try {
 			stmt = c.createStatement();
@@ -229,6 +172,40 @@ public class CircularDetection {
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
 			System.exit(0);
+		}
+	}
+	private static class UserData {
+		public UserData(int userId, int managerId, String UserName) {
+			setUserId(userId);
+			setManagerId(managerId);
+			setUserName(UserName);
+		}
+		private int UserId;
+		private String UserName;
+		private int ManagerId;
+
+		public int getUserId() {
+			return UserId;
+		}
+
+		public final void setUserId(int value) {
+			UserId = value;
+		}
+
+		public final int getManagerId() {
+			return ManagerId;
+		}
+
+		public final void setManagerId(int value) {
+			ManagerId = value;
+		}
+
+		public String getUserName() {
+			return UserName;
+		}
+
+		public void setUserName(String userName) {
+			UserName = userName;
 		}
 	}
 }
